@@ -1,0 +1,61 @@
+---
+title: "Data poor validation" 
+subtitle: "Myers data"
+author: "Laurence Kell"
+output: rmarkdown:::pdf_document
+vignette: >
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEncoding{UTF-8}
+tags: FLPKG FLR
+license: Creative Commons Attribution-ShareAlike 4.0 International
+---
+  
+```{r knitr_init, echo=FALSE, results="hide"}
+library(knitr)
+## Global options
+opts_chunk$set(echo    =FALSE,
+               eval    =TRUE,
+               cache   =TRUE,
+               cache.path="../cache/myers/",
+               prompt  =FALSE,
+               comment =NA,
+               message =FALSE,
+               tidy    =FALSE,
+               warning =FALSE,
+               fig.height=4.5,
+               fig.width =8,
+               fig.path  ="../tex/myers-")
+
+options(digits=3)
+
+iFig=0
+```
+```{r}
+dirMy="/home/laurence-kell/Desktop/papers/dataPoor"
+```
+
+```{r, pkgs, echo=FALSE, message=FALSE}
+library(GGally)
+```
+
+```{r, data}
+load(file.path(dirMy,"results/final.RData"))
+
+ggpairs(log(final[,c("bbmsy","sra","bd4","bd")]))
+```
+
+
+```{r}
+ggpairs(tab[,3:5])
+```
+
+**Figure `r iFig=iFig+1; iFig`** 
+
+
+```{r}
+tab=ddply(tab,.(stockid), function(x) x[x$year==max(x$year),])
+ggpairs(tab[,3:5])
+```
+
+**Figure `r iFig=iFig+1; iFig`** 
