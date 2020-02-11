@@ -37,7 +37,7 @@ dirMy="/home/laurence-kell/Desktop/papers/data-poor"
 
 ```{r, pkgs, echo=FALSE, message=FALSE}
 library(reshape)
-library(reshape)
+library(plyr)
 library(GGally)
 ```
 
@@ -51,58 +51,39 @@ bbmsy=cast(bbmsy,assessid+year~run,value="mean")
 bbmsy=merge(bbmsy,myers,by=c("assessid","year"))
 ```
 
-```{r}
-ggplot(bbmsy)+
-  geom_point(aes(biomass,bd4))+
-  scale_x_log10()+scale_y_log10()
-```
-
-**Figure `r iFig=iFig+1; iFig`** Biomass dynamic model
-
-```{r}
-ggplot(bbmsy)+
-  geom_point(aes(biomass,sra))+
-  scale_x_log10()+scale_y_log10()
-```
-
-**Figure `r iFig=iFig+1; iFig`** SRA
-
 
 ```{r}
 ggpairs(log(bbmsy[,c("biomass","bd","bd4","sra")]))
 ```
 
-**Figure `r iFig=iFig+1; iFig`** log 
+**Figure `r iFig=iFig+1; iFig`** Comparison of trends. 
 
-```{r, eval=FALSE}
-fBio=ddply(myers,.(assessid), with, {
-  maxYr=max(year)
-  data.frame(year   =maxYr,
-             biomass=biomass[year==maxYr])
-  })
+```{r}
+fnl=ddply(bbmsy, .(assessid), function(x) x[x$year==max(x$year),])
 
-bbmsy=ddply(subset(runs,variable=="b_div_bmsy"),.(assessid,run), with, {
-  maxYr=max(year)
-  data.frame(year =maxYr,
-             bbmsy=mean[year==maxYr])
-})
+ggpairs(log(fnl[,c("biomass","bd","bd4","sra")]))
+```
 
+**Figure `r iFig=iFig+1; iFig`** Comparison of final depletion.
 
-final=cast(final,assessid~run,value="bbmsy")
+```{r}
+cvFn=function(x) (var(x,na.rm=TRUE)^1/2)/mean(x,na.rm=TRUE)
 
+cv=ddply(bbmsy, .(assessid), with, data.frame(
+                                        biomass=cvFn(biomass),
+                                        bd     =cvFn(bd),
+                                        bd4    =cvFn(bd4),
+                                        sra    =cvFn(sra)))
 
+ggpairs(log(cv[,c("biomass","bd","bd4","sra")]))
+```
 
-final=merge(final,fBio[,-2])
-names(final)[5]="bbmsy"
+**Figure `r iFig=iFig+1; iFig`** CVs.
 
-save(final,file=file.path(dirMy,"results/final.RData"))
+```{r}
+mm=merge(fnl,cv,by="assessid")
 
-ggpairs(log(final[,c("bbmsy","sra","bd4","bd")]))
-
-tab=transform(final,bd=bd>1,bd4=bd4>1,sra=sra>1,bbmsy=bbmsy>1)
-
-table(tab$bd, tab$bbmsy)
-table(tab$bd4,tab$bbmsy)
-table(tab$sra,tab$bbmsy)
+ggplot(mm)+
+  geom_point(aes(log(biomass.x),log(bd4.x),col=log(biomass.y)),size=2.5)
 ```
 
