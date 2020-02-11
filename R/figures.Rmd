@@ -23,8 +23,8 @@ opts_chunk$set(echo    =FALSE,
                message =FALSE,
                tidy    =FALSE,
                warning =FALSE,
-               fig.height=4.5,
-               fig.width =8,
+               fig.height=6,
+               fig.width =6,
                fig.path  ="../tex/myers-")
 
 options(digits=3)
@@ -32,30 +32,77 @@ options(digits=3)
 iFig=0
 ```
 ```{r}
-dirMy="/home/laurence-kell/Desktop/papers/dataPoor"
+dirMy="/home/laurence-kell/Desktop/papers/data-poor"
 ```
 
 ```{r, pkgs, echo=FALSE, message=FALSE}
+library(reshape)
+library(reshape)
 library(GGally)
 ```
 
-```{r, data}
-load(file.path(dirMy,"results/final.RData"))
+```{r, data, fig.height=6, fig.width=6}
+load(file.path(dirMy,"data/myers.RData"))
+load(file.path(dirMy,"results/myersRuns.RData"))
+
+bbmsy=subset(runs,variable=="b_div_bmsy")
+bbmsy=cast(bbmsy,assessid+year~run,value="mean")
+
+bbmsy=merge(bbmsy,myers,by=c("assessid","year"))
+```
+
+```{r}
+ggplot(bbmsy)+
+  geom_point(aes(biomass,bd4))+
+  scale_x_log10()+scale_y_log10()
+```
+
+**Figure `r iFig=iFig+1; iFig`** Biomass dynamic model
+
+```{r}
+ggplot(bbmsy)+
+  geom_point(aes(biomass,sra))+
+  scale_x_log10()+scale_y_log10()
+```
+
+**Figure `r iFig=iFig+1; iFig`** SRA
+
+
+```{r}
+ggpairs(log(bbmsy[,c("biomass","bd","bd4","sra")]))
+```
+
+**Figure `r iFig=iFig+1; iFig`** log 
+
+```{r, eval=FALSE}
+fBio=ddply(myers,.(assessid), with, {
+  maxYr=max(year)
+  data.frame(year   =maxYr,
+             biomass=biomass[year==maxYr])
+  })
+
+bbmsy=ddply(subset(runs,variable=="b_div_bmsy"),.(assessid,run), with, {
+  maxYr=max(year)
+  data.frame(year =maxYr,
+             bbmsy=mean[year==maxYr])
+})
+
+
+final=cast(final,assessid~run,value="bbmsy")
+
+
+
+final=merge(final,fBio[,-2])
+names(final)[5]="bbmsy"
+
+save(final,file=file.path(dirMy,"results/final.RData"))
 
 ggpairs(log(final[,c("bbmsy","sra","bd4","bd")]))
+
+tab=transform(final,bd=bd>1,bd4=bd4>1,sra=sra>1,bbmsy=bbmsy>1)
+
+table(tab$bd, tab$bbmsy)
+table(tab$bd4,tab$bbmsy)
+table(tab$sra,tab$bbmsy)
 ```
 
-
-```{r}
-ggpairs(tab[,3:5])
-```
-
-**Figure `r iFig=iFig+1; iFig`** 
-
-
-```{r}
-tab=ddply(tab,.(stockid), function(x) x[x$year==max(x$year),])
-ggpairs(tab[,3:5])
-```
-
-**Figure `r iFig=iFig+1; iFig`** 

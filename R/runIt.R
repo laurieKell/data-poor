@@ -2,9 +2,6 @@ library(reshape)
 library(plyr)
 library(dplyr)
 library(ggplot2)
-library(FLife)
-library(mydas)
-library(popbio)
 
 library(doParallel)
 library(foreach)
@@ -12,7 +9,7 @@ library(foreach)
 cl= makeCluster(5)
 registerDoParallel(cl)
 
-dirMy="/home/laurence-kell/Desktop/papers/dataPoor"
+dirMy="/home/laurence-kell/Desktop/papers/data-poor"
 
 ## FAO Taxa
 load(file.path(dirMy,"data/fao_taxa.rda"))
@@ -39,27 +36,6 @@ fb=ddply(fb, .(species),  function(x)  data.frame(
   a   =mean(x$a,      na.rm=T),
   b   =mean(x$b,      na.rm=T),
   m   =mean(x$m,      na.rm=T)))
-
-##Reference points
-source('~/Desktop/flr/FLife/R/FLife-lhPar.R', echo=TRUE)
-
-popdyn2<-function(x) {
-  n<<-n+1
-  print(n)
-  if (is.na(x["linf"])) return(NULL) 
-  
-  sx=x[-1]
-  x=try(as(x[,names(x)[!is.na(x)]],"FLPar"))
-  if ("try.error"%in%is(x)) return(NULL)
-  x=lhPar(x)
-  
-  x=try(popdyn(x))
-  if ("try.error"%in%is(x)) return(NULL) else return(model.frame(x))}
-
-n=0
-pd=subset(fb,species%in%unique(myers$species))
-pd=adply(pd[,c("species","linf","k","t0","a","b","l50")],1,popdyn2)
-save(pd,file=file.path(dirMy,"data/pd.RData"))
 
 fnBD<-function(assessid,stockid,biomass,catch,year,spp,dir,cv=NULL){
   
@@ -175,25 +151,7 @@ runs=mdply(runs, function(run,assessid) {
        
        fit$results})
 runs$assessid=gsub(".RData","",runs$assessid)
-save(runs,file=file.path(dirMy,"results/myers.RData"))
+runs$assessid=laply(strsplit(runs[,2],"\\."),function(x) x[[2]])
 
-final=ddply(subset(runs,variable=="b_div_bmsy"),.(assessid,run), with, {
-  maxYr=max(year)
-  data.frame(year =maxYr,
-             bbmsy=mean[year==maxYr])
-})
-final=cast(final,assessid~run,value="bbmsy")
-final$assessid=laply(strsplit(final[,1],"\\."),function(x) x[[2]])
-
-
-fBio=ddply(myers,.(assessid), with, {
-  maxYr=max(year)
-  data.frame(year   =maxYr,
-             biomass=biomass[year==maxYr])
-  })
-
-final=merge(final,fBio[,-2])
-names(final)[5]="bbmsy"
-
-save(final,file=file.path(dirMy,"results/final.RData"))
+save(runs,file=file.path(dirMy,"results/myersRuns.RData"))
 
