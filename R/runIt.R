@@ -49,7 +49,7 @@ fnBD<-function(assessid,stockid,biomass,catch,year,spp,dir,cv=NULL){
   if (is.numeric(cv)){
     set.seed(1233)
     biomass=biomass*exp(rlnorm(length(biomass),0,cv))}
-  biomass=biomass*mean(catch)
+  biomass=biomass*mean(catch)*4
   
   cdp<-try(sraplus::format_driors(
     b_ref_type ="b",
@@ -69,10 +69,19 @@ fnBD<-function(assessid,stockid,biomass,catch,year,spp,dir,cv=NULL){
   fit<-try(sraplus::fit_sraplus(
     driors = cdp,      
     engine = "tmb",
-    model  = "sraplus_tmb"))
+    model  = "sraplus_tmb",
+    adapt_delta = 0.9,
+    max_treedepth = 10,
+    n_keep = 4000,
+    chains = 1,
+    cores = 1,
+    estimate_qslope = FALSE,
+    estimate_proc_error = TRUE))
   
   if (!("try-error"%in%is(fit)))
     save(fit,file=file.path(dir,paste(stockid,assessid,"RData",sep=".")))
+  
+  save(biomass,file=file.path(dir,paste(stockid,assessid,"u",sep=".")))
   
   "try-error"%in%is(fit)}
 
@@ -121,8 +130,13 @@ fnSRA<-function(assessid,stockid,biomass,catch,year,spp,dir,cv=NULL){
   fit<-try(sraplus::fit_sraplus(
     driors = cdp,
     engine = "sir",
-    draws  = 1e6,
-    n_keep = 2000))
+    adapt_delta = 0.9,
+    max_treedepth = 10,
+    n_keep = 4000,
+    chains = 1,
+    cores = 1,
+    estimate_qslope = FALSE,
+    estimate_proc_error = TRUE))
   
   if (!("try-error"%in%is(fit)))
     save(fit,file=file.path(dir,paste(stockid,assessid,"RData",sep=".")))
@@ -138,9 +152,9 @@ foreach(i=rev(seq(dim(control)[1])),
        fnSRA(assessid,stockid,biomass,catch,year,species,dir=file.path(dirMy,"results/sra")))
 
 runs=as.data.frame(rbind(
-           cbind(run="bd",   assessid=system2("ls",args=file.path(dirMy,"results/bd"),  stdout=T)),
-           cbind(run="bd4",  assessid=system2("ls",args=file.path(dirMy,"results/bd4"), stdout=T)),
-           cbind(run="sra",  assessid=system2("ls",args=file.path(dirMy,"results/sra"), stdout=T))))
+           cbind(run="bd",   assessid=list.files(file.path(dirMy,"results/bd"))),
+           cbind(run="bd4",  assessid=list.files(file.path(dirMy,"results/bd4"))),
+           cbind(run="sra",  assessid=list.files(file.path(dirMy,"results/sra")))))
 runs=runs[grep(".RData",runs$assessid),]
 
 runs=mdply(runs, function(run,assessid) {
@@ -155,3 +169,29 @@ runs$assessid=laply(strsplit(runs[,2],"\\."),function(x) x[[2]])
 
 save(runs,file=file.path(dirMy,"results/myersRuns.RData"))
 
+
+
+##################################
+    driors,
+    ~ sfs(
+      driors = .x,
+      engine = "tmb",
+      model = "sraplus_tmb",
+      adapt_delta = 0.9,
+      max_treedepth = 10,
+      n_keep = 4000,
+      chains = 1,
+      cores = 1,
+      estimate_qslope = FALSE,
+      estimate_proc_error = TRUE)
+
+driors = map2(
+  taxa,
+  data,
+  ~
+    format_driors(
+      taxa = .x,shape_prior=1.01,      #use_heuristics = T,shape_prior=2,
+      catch = .y$capture,
+      years = .y$year,
+      initial_state = 0.9,initial_state_cv = 0.2,b_ref_type = "k",
+      index = .y$E1[!is.na(.y$E1)],index_years=.y$year[!is.na(.y$E1)]) 

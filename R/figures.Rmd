@@ -25,23 +25,24 @@ opts_chunk$set(echo    =FALSE,
                warning =FALSE,
                fig.height=6,
                fig.width =6,
-               fig.path  ="../tex/myers-")
+               fig.path  ="../tex/myers-",
+               dev       ="png")
 
 options(digits=3)
 
 iFig=0
 ```
-```{r}
-dirMy="/home/laurence-kell/Desktop/papers/data-poor"
-```
 
 ```{r, pkgs, echo=FALSE, message=FALSE}
 library(reshape)
 library(plyr)
+library(dplyr)
 library(GGally)
 ```
 
 ```{r, data, fig.height=6, fig.width=6}
+dirMy="/home/laurence-kell/Desktop/papers/data-poor"
+
 load(file.path(dirMy,"data/myers.RData"))
 load(file.path(dirMy,"results/myersRuns.RData"))
 
@@ -52,21 +53,73 @@ bbmsy=merge(bbmsy,myers,by=c("assessid","year"))
 ```
 
 
-```{r}
-ggpairs(log(bbmsy[,c("biomass","bd","bd4","sra")]))
+```{r, trend}
+trnd=bbmsy[,c("biomass","bd4","sra")]
+trnd$u=trnd$biomass*exp(rlnorm(length(trnd$biomass),0,0.4))
+
+ggpairs(log(trnd[,c("biomass","u","bd4","sra")]))
 ```
 
 **Figure `r iFig=iFig+1; iFig`** Comparison of trends. 
 
-```{r}
-fnl=ddply(bbmsy, .(assessid), function(x) x[x$year==max(x$year),])
+```{r, dplt-final}
+fnl=ddply(bbmsy, .(assessid), function(x) x[x$year>=max(x$year)-4,])
 
-ggpairs(log(fnl[,c("biomass","bd","bd4","sra")]))
+ggpairs(log(fnl[,c("biomass","bd4","sra")]))
 ```
 
-**Figure `r iFig=iFig+1; iFig`** Comparison of final depletion.
+**Figure `r iFig=iFig+1; iFig`** Comparison depeletion estimates in final year. 
 
-```{r}
+```{r, regression}
+trend<-function(x,n=10){
+    
+    if (length(x)<n) return(NA)
+    
+    y=x[length(x)-(n:1)+1]
+    
+    if (any(is.na(x))) return(NA)
+    
+    lm(y~x,data=data.frame(x=seq(n),y=y))$coef[2]}
+
+trd=ddply(bbmsy, .(assessid), with, data.frame(
+                                         biomass=trend(biomass),
+                                         bd4    =trend(bd4),
+                                         sra    =trend(sra)))
+
+ggpairs(trd[,c("biomass","bd4","sra")])
+```
+
+**Figure `r iFig=iFig+1; iFig`** Comparison of final trends. 
+
+```{r, 2o3}
+twothree<-function(x,n1=2,n2=3){
+  
+  if (length(x)<n1+n2) return(NULL)
+  
+  mean(x[length(x)-seq(n1)+1])/mean(x[length(x)-(n1+n2):n2+1])}
+
+t23=ddply(bbmsy, .(assessid), with, data.frame(
+                                          biomass=twothree(biomass),
+                                          bd4    =twothree(bd4),
+                                          sra    =twothree(sra)))
+
+
+ggpairs(log(t23[,c("biomass","bd4","sra")]))
+```
+
+**Figure `r iFig=iFig+1; iFig`** Comparison of final trends. 
+
+```{r, trend-5}
+fnl=ddply(bbmsy, .(assessid), function(x) x[x$year<=max(x$year)-4,])
+trnd=bbmsy[,c("biomass","bd4","sra")]
+trnd$u=trnd$biomass*exp(rlnorm(length(trnd$biomass),0,0.4))
+
+ggpairs(log(trnd[,c("biomass","u","bd4","sra")]))
+```
+
+**Figure `r iFig=iFig+1; iFig`** Comparison of trends for final 5 years. 
+
+```{r, cv}
 cvFn=function(x) (var(x,na.rm=TRUE)^1/2)/mean(x,na.rm=TRUE)
 
 cv=ddply(bbmsy, .(assessid), with, data.frame(
@@ -74,16 +127,76 @@ cv=ddply(bbmsy, .(assessid), with, data.frame(
                                         bd     =cvFn(bd),
                                         bd4    =cvFn(bd4),
                                         sra    =cvFn(sra)))
-
-ggpairs(log(cv[,c("biomass","bd","bd4","sra")]))
 ```
-
-**Figure `r iFig=iFig+1; iFig`** CVs.
 
 ```{r}
-mm=merge(fnl,cv,by="assessid")
-
-ggplot(mm)+
-  geom_point(aes(log(biomass.x),log(bd4.x),col=log(biomass.y)),size=2.5)
+save(fnl,bbmsy,file="/home/laurence-kell/Desktop/dat.RData")
 ```
 
+```{r}
+chk=ddply(fnl[,c(1,4:5)],.(assessid),with,data.frame(flag=!is.na(bd4)&!is.na(sra)))
+
+cat=transmute(fnl,catsra  =paste("OM=",biomass>1," MP=",sra>1,sep=""),
+                  catbd   =paste("OM=",biomass>1," MP=",bd4>1,sep=""),
+                  assessid=assessid)
+bb =merge(bbmsy,cat)
+bb =subset(bb,assessid%in%subset(chk,flag)[,1])
+bb =ddply(bb,.(assessid), transform, catch=catch/mean(catch))
+
+
+bb =melt(bb[,c("assessid","year","sra","bd4","biomass","catch","catsra","catbd")],id=c("assessid","year","catsra","catbd"))
+
+bb$catsra=factor(bb$catsra,levels=c("OM=TRUE MP=TRUE", "OM=FALSE MP=FALSE",
+                                    "OM=TRUE MP=FALSE","OM=FALSE MP=TRUE"))
+bb$catbd =factor(bb$catbd, levels=c("OM=TRUE MP=TRUE", "OM=FALSE MP=FALSE",
+                                    "OM=TRUE MP=FALSE","OM=FALSE MP=TRUE"))
+
+dat=subset(bb,catbd=="OM=TRUE MP=TRUE")
+dat=subset(dat,assessid%in%sample(unique(dat$assessid),10))
+
+ggplot(dat)+
+  geom_line(aes(year,value,group=assessid,col=catsra))+
+  facet_grid(variable~.,scale="free")+
+  theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`** BD T*T
+
+
+```{r}
+dat=subset(bb,catbd=="OM=FALSE MP=FALSE")
+dat=subset(dat,assessid%in%sample(unique(dat$assessid),10))
+
+ggplot(dat)+
+  geom_line(aes(year,value,group=assessid,col=catsra))+
+  facet_grid(variable~.,scale="free")+
+  theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`** BD F*F
+
+
+```{r}
+dat=subset(bb,catbd=="OM=TRUE MP=FALSE")
+dat=subset(dat,assessid%in%sample(unique(dat$assessid),10))
+
+ggplot(dat)+   
+  geom_line(aes(year,value,group=assessid,col=catsra))+
+  facet_grid(variable~.,scale="free")+
+  theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`** BD T*F
+
+
+```{r}
+dat=subset(bb,catbd=="OM=FALSE MP=TRUE")
+dat=subset(dat,assessid%in%sample(unique(dat$assessid),10))
+
+ggplot(dat)+ 
+  geom_line(aes(year,value,group=assessid,col=catsra))+
+  facet_grid(variable~.,scale="free")+
+  theme(legend.position="bottom")
+```
+
+**Figure `r iFig=iFig+1; iFig`** BD F*T
