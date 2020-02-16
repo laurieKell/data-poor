@@ -57,12 +57,12 @@ fnBD<-function(assessid,stockid,biomass,catch,year,spp,dir,cv=NULL){
     index_year = year,
     catch      = catch,
     years      = year,
-    initial_state=biomass[1],
-    terminal_state=biomass[length(biomass)],
-    initial_state_cv=0.05,
-    terminal_state_cv=0.05,
+    #initial_state=biomass[1],
+    #terminal_state=biomass[length(biomass)],
+    #initial_state_cv=0.05,
+    #terminal_state_cv=0.05,
     taxa       = spp[1],
-    use_heuristics=TRUE))
+    use_heuristics=!TRUE))
   
   if ("try-error"%in%is(cdp)) return(NULL)
   
@@ -84,26 +84,6 @@ fnBD<-function(assessid,stockid,biomass,catch,year,spp,dir,cv=NULL){
   save(biomass,file=file.path(dir,paste(stockid,assessid,"u",sep=".")))
   
   "try-error"%in%is(fit)}
-
-control=myers[!duplicated(myers[,c("assessid","stockid")]),c("assessid","stockid")]
-
-##Benchmark
-foreach(i=seq(dim(control)[1]),
-        .combine="c",
-        .packages=c("sraplus"),
-        .export  =c("myers","control")
-        ) %do% 
-     with(subset(myers,assessid==control[i,"assessid"]&stockid==control[i,"stockid"]),  
-          fnBD(assessid,stockid,biomass,catch,year,species,dir=file.path(dirMy,"results/bd")))
-
-##CV of 40%
-foreach(i=rev(seq(dim(control)[1])),
-        .combine="c",
-        .packages=c("sraplus"),
-        .export  =c("myers","control")
-) %do% 
-  with(subset(myers,assessid==control[i,"assessid"]&stockid==control[i,"stockid"]),  
-       fnBD(assessid,stockid,biomass,catch,year,species,dir=file.path(dirMy,"results/bd4"),cv=0.4))
 
 ##SRA
 fnSRA<-function(assessid,stockid,biomass,catch,year,spp,dir,cv=NULL){
@@ -143,11 +123,53 @@ fnSRA<-function(assessid,stockid,biomass,catch,year,spp,dir,cv=NULL){
   
   "try-error"%in%is(fit)}
 
-foreach(i=rev(seq(dim(control)[1])),
-        .combine="c",
-        .packages=c("sraplus"),
-        .export  =c("myers","control")
-) %do% 
+control=myers[!duplicated(myers[,c("assessid","stockid")]),c("assessid","stockid")]
+control=subset(control,!(assessid%in%c("CSIRO-TIGERFLATSE-1915-2015-MOESENEDER",
+                                       "WGCSE-MEGSPPIVa-VIa-1985-2016-ICESIMP2018",
+                                       "NEFSC-ATHAL5YZ-1800-2007-COL",
+                                       "SEFSC-GTRIGGM-1945-2013-SISIMP2016",
+                                       "NIWA-OROUGHYNZMEC-1882-2014-FU",
+                                       "NIWA-OROUGHYNZMEC-1909-2011-CORDUE",
+                                       "FAFRFJ-PILCHTSST-1960-2013-JPNIMP2016",
+                                       "SEFSC-PINKSHRIMPGM-1984-2013-SISIMP2016",
+                                       "NAFO-SC-REDFISHSPP3LN-1959-2013-WATSON",
+                                       "IFOPCH-RSQLOBSTERNCH-1969-2015-PARMA",
+                                       "NIWA-SCMPMB-1989-2014-FU",
+                                       "CSIRO-TIGERFLATSE-1913-2006-FULTON",
+                                       "SEFSC-WSHRIMPGM-1984-2014-SISIMP2016",
+                                       "SEFSC-YEGROUPGM-1975-2009-HIVELY",
+                                       "NEFSC-SFLOUNMATLC-1982-2014-SISIMP2016",
+                                       "NIWA-NZSNAPNZ1BOP-HAGU-1899-2013-FU",
+                                       "NIWA-NZSNAPNZ1ENLD-1899-2013-FU",
+                                       "AFSC-TANNERCRABBSAI-1965-2015-SISIMP2016",
+                                       "NEFSC-SFLOUNMATLC-1940-2012-HIVELY",
+                                       "SPC-SKJCWPAC-1950-2015-PONS",
+                                       "SPC-SKJCWPAC-1950-2012-PONS",
+                                       "NWFSC-BLACKROCKSPCOAST-1915-2007-BRANCH",
+                                       "NWFSC-CHROCKCPCOAST-1900-2015-SISIMP2016",
+                                       "SWFSC-COWCODSCAL-1900-2012-SISIMP2016 COWCODSCAL",
+                                       "SWFSC-CPRROCKPCOAST-1916-2012-SISIMP2016",
+                                       "NWFSC-CROCKPCOAST-1916-2011-STACHURA",
+                                       "NWFSC-ESOLEPCOAST-1876-2007-BRANCH",
+                                       "SWFSC-GRSPROCKSCAL-1916-2010-STACHURA",
+                                       "NWFSC-LSTHORNHPCOAST-1964-2012-HIVELY",
+                                       "CSIRO-MORWONGSE-1913-2007-FULTON",
+                                       "RSNAPSATLC-1954-2010-HIVELY")))
+
+##Benchmark
+for (i in seq(dim(control)[1]))
+     with(subset(myers,assessid==control[i,"assessid"]&stockid==control[i,"stockid"]),  
+          fnBD(assessid,stockid,biomass,catch,year,species,dir=file.path(dirMy,"results/bd")))
+
+##CV of 40%
+for (i in seq(dim(control)[1]))
+  with(subset(myers,assessid==control[i,"assessid"]&stockid==control[i,"stockid"]),  
+       fnBD(assessid,stockid,biomass,catch,year,species,dir=file.path(dirMy,"results/bd4"),cv=0.4))
+
+seq(dim(control)[1])[control[,1]=="SEFSC-RSNAPGM-1872-2013-SISIMP2016"]+1
+
+##SRA
+for (i in 303:dim(control)[1])
   with(subset(myers,assessid==control[i,"assessid"]&stockid==control[i,"stockid"]),  
        fnSRA(assessid,stockid,biomass,catch,year,species,dir=file.path(dirMy,"results/sra")))
 
@@ -170,28 +192,3 @@ runs$assessid=laply(strsplit(runs[,2],"\\."),function(x) x[[2]])
 save(runs,file=file.path(dirMy,"results/myersRuns.RData"))
 
 
-
-##################################
-    driors,
-    ~ sfs(
-      driors = .x,
-      engine = "tmb",
-      model = "sraplus_tmb",
-      adapt_delta = 0.9,
-      max_treedepth = 10,
-      n_keep = 4000,
-      chains = 1,
-      cores = 1,
-      estimate_qslope = FALSE,
-      estimate_proc_error = TRUE)
-
-driors = map2(
-  taxa,
-  data,
-  ~
-    format_driors(
-      taxa = .x,shape_prior=1.01,      #use_heuristics = T,shape_prior=2,
-      catch = .y$capture,
-      years = .y$year,
-      initial_state = 0.9,initial_state_cv = 0.2,b_ref_type = "k",
-      index = .y$E1[!is.na(.y$E1)],index_years=.y$year[!is.na(.y$E1)]) 

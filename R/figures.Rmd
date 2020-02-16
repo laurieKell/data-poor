@@ -54,21 +54,28 @@ bbmsy=merge(bbmsy,myers,by=c("assessid","year"))
 
 
 ```{r, trend}
-trnd=bbmsy[,c("biomass","bd4","sra")]
-trnd$u=trnd$biomass*exp(rlnorm(length(trnd$biomass),0,0.4))
+trnd=bbmsy[,c("biomass","bd","bd4","sra")]
 
-ggpairs(log(trnd[,c("biomass","u","bd4","sra")]))
+my_lower<-function(data,mapping,...){
+  ggplot(data=data,mapping=mapping)+
+    #geom_smooth(method="lm",se=FALSE,fullrange=TRUE)+
+    geom_point(...)+
+    scale_shape_manual(values=c(0,1))}
+
+my_density<-function(data,mapping,...){
+  ggplot(data=data,mapping=mapping)+
+    geom_density(...,lwd=1)}
+
+ggpairs(log(trnd),columns=1:4,
+           #mapping=aes(color=smoke,shape=sex,lty=sex),
+           columnLabels=c("True\nAbundance","Biomass\nDynamic","BD with 40% CV","SRA"),
+           lower=list(continuous=wrap(my_lower,alpha=0.25,col="black",fill="red")),
+           diag=list(continuous=wrap(my_density,alpha=0.5)),
+           upper=list(continuous=wrap("cor",size=4)))+
+          theme_bw()
 ```
 
-**Figure `r iFig=iFig+1; iFig`** Comparison of trends. 
-
-```{r, dplt-final}
-fnl=ddply(bbmsy, .(assessid), function(x) x[x$year>=max(x$year)-4,])
-
-ggpairs(log(fnl[,c("biomass","bd4","sra")]))
-```
-
-**Figure `r iFig=iFig+1; iFig`** Comparison depeletion estimates in final year. 
+**Figure `r iFig=iFig+1; iFig`** Comparison of time series. 
 
 ```{r, regression}
 trend<-function(x,n=10){
@@ -83,13 +90,34 @@ trend<-function(x,n=10){
 
 trd=ddply(bbmsy, .(assessid), with, data.frame(
                                          biomass=trend(biomass),
+                                         bd     =trend(bd),
                                          bd4    =trend(bd4),
                                          sra    =trend(sra)))
 
-ggpairs(trd[,c("biomass","bd4","sra")])
+ggpairs(trd[,-1],
+           columnLabels=c("True\nAbundance","Biomass\nDynamic","BD with 40% CV","SRA"),
+           lower=list(continuous=wrap(my_lower,alpha=0.25,col="black",fill="red")),
+           diag=list(continuous=wrap(my_density,alpha=0.5)),
+           upper=list(continuous=wrap("cor",size=4)))+
+          theme_bw()
 ```
 
-**Figure `r iFig=iFig+1; iFig`** Comparison of final trends. 
+**Figure `r iFig=iFig+1; iFig`** Comparison of trends in last 10 years. 
+
+
+```{r, trend-5}
+fnl=ddply(bbmsy, .(assessid), function(x) x[x$year>=max(x$year)-4,])
+
+ggpairs(log(fnl[,c("biomass","bd","bd4","sra")]),
+           columnLabels=c("True\nAbundance","Biomass\nDynamic","BD with 40% CV","SRA"),
+           lower=list(continuous=wrap(my_lower,alpha=0.25,col="black",fill="red")),
+           diag=list(continuous=wrap(my_density,alpha=0.5)),
+           upper=list(continuous=wrap("cor",size=4)))+
+          theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`** Comparison of trends in last 5 years. 
+
 
 ```{r, 2o3}
 twothree<-function(x,n1=2,n2=3){
@@ -100,38 +128,40 @@ twothree<-function(x,n1=2,n2=3){
 
 t23=ddply(bbmsy, .(assessid), with, data.frame(
                                           biomass=twothree(biomass),
+                                          bd     =twothree(bd),
                                           bd4    =twothree(bd4),
                                           sra    =twothree(sra)))
 
 
-ggpairs(log(t23[,c("biomass","bd4","sra")]))
+ggpairs(t23[,-1],
+           columnLabels=c("True\nAbundance","Biomass\nDynamic","BD with 40% CV","SRA"),
+           lower=list(continuous=wrap(my_lower,alpha=0.25,col="black",fill="red")),
+           diag=list(continuous=wrap(my_density,alpha=0.5)),
+           upper=list(continuous=wrap("cor",size=4)))+
+          theme_bw()
 ```
 
-**Figure `r iFig=iFig+1; iFig`** Comparison of final trends. 
+**Figure `r iFig=iFig+1; iFig`** Comparison of 2 over 3, i.e. mean of last 2 years divided by mean in years -5 to -3. 
 
-```{r, trend-5}
-fnl=ddply(bbmsy, .(assessid), function(x) x[x$year<=max(x$year)-4,])
-trnd=bbmsy[,c("biomass","bd4","sra")]
-trnd$u=trnd$biomass*exp(rlnorm(length(trnd$biomass),0,0.4))
 
-ggpairs(log(trnd[,c("biomass","u","bd4","sra")]))
+```{r, dplt-final}
+fnl=ddply(bbmsy, .(assessid), function(x) x[x$year>=max(x$year)-4,])
+
+ggpairs(log(fnl[,c("biomass","bd","bd4","sra")]),
+           columnLabels=c("True\nAbundance","Biomass\nDynamic","BD with 40% CV","SRA"),
+           lower=list(continuous=wrap(my_lower,alpha=0.25,col="black",fill="red")),
+           diag=list(continuous=wrap(my_density,alpha=0.5)),
+           upper=list(continuous=wrap("cor",size=4)))+
+          theme_bw()
 ```
 
-**Figure `r iFig=iFig+1; iFig`** Comparison of trends for final 5 years. 
+**Figure `r iFig=iFig+1; iFig`** Comparison of depeletion estimates in final year. 
+
 
 ```{r, cv}
 cvFn=function(x) (var(x,na.rm=TRUE)^1/2)/mean(x,na.rm=TRUE)
-
-cv=ddply(bbmsy, .(assessid), with, data.frame(
-                                        biomass=cvFn(biomass),
-                                        bd     =cvFn(bd),
-                                        bd4    =cvFn(bd4),
-                                        sra    =cvFn(sra)))
 ```
 
-```{r}
-save(fnl,bbmsy,file="/home/laurence-kell/Desktop/dat.RData")
-```
 
 ```{r}
 chk=ddply(fnl[,c(1,4:5)],.(assessid),with,data.frame(flag=!is.na(bd4)&!is.na(sra)))
