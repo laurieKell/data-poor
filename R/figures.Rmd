@@ -145,7 +145,7 @@ ggpairs(t23[,-1],
 
 
 ```{r, dplt-final}
-fnl=ddply(bbmsy, .(assessid), function(x) x[x$year>=max(x$year)-4,])
+fnl=ddply(bbmsy, .(assessid), function(x) x[x$year==max(x$year),])
 
 ggpairs(log(fnl[,c("biomass","bd","bd4","sra")]),
            columnLabels=c("True\nAbundance","Biomass\nDynamic","BD with 40% CV","SRA"),
