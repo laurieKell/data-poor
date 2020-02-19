@@ -2,7 +2,7 @@
 title: "Data poor validation" 
 subtitle: "Myers data"
 author: "Laurence Kell"
-output: rmarkdown:::pdf_document
+output: rmarkdown:::word_document
 vignette: >
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteIndexEntry{Vignette Title}
@@ -69,13 +69,13 @@ my_density<-function(data,mapping,...){
 ggpairs(log(trnd),columns=1:4,
            #mapping=aes(color=smoke,shape=sex,lty=sex),
            columnLabels=c("True\nAbundance","Biomass\nDynamic","BD with 40% CV","SRA"),
-           lower=list(continuous=wrap(my_lower,alpha=0.25,col="black",fill="red")),
+           lower=list(continuous=wrap(my_lower,alpha=0.25,fill="black")),
            diag=list(continuous=wrap(my_density,alpha=0.5)),
            upper=list(continuous=wrap("cor",size=4)))+
           theme_bw()
 ```
 
-**Figure `r iFig=iFig+1; iFig`** Comparison of time series. 
+**Figure `r iFig=iFig+1; iFig`** Correlations between trends over entire series. 
 
 ```{r, regression}
 trend<-function(x,n=10){
@@ -96,13 +96,13 @@ trd=ddply(bbmsy, .(assessid), with, data.frame(
 
 ggpairs(trd[,-1],
            columnLabels=c("True\nAbundance","Biomass\nDynamic","BD with 40% CV","SRA"),
-           lower=list(continuous=wrap(my_lower,alpha=0.25,col="black",fill="red")),
+           lower=list(continuous=wrap(my_lower,alpha=0.25,fill="black")),
            diag=list(continuous=wrap(my_density,alpha=0.5)),
            upper=list(continuous=wrap("cor",size=4)))+
           theme_bw()
 ```
 
-**Figure `r iFig=iFig+1; iFig`** Comparison of trends in last 10 years. 
+**Figure `r iFig=iFig+1; iFig`** Correlations between trends in last 10 years. 
 
 
 ```{r, trend-5}
@@ -110,13 +110,13 @@ fnl=ddply(bbmsy, .(assessid), function(x) x[x$year>=max(x$year)-4,])
 
 ggpairs(log(fnl[,c("biomass","bd","bd4","sra")]),
            columnLabels=c("True\nAbundance","Biomass\nDynamic","BD with 40% CV","SRA"),
-           lower=list(continuous=wrap(my_lower,alpha=0.25,col="black",fill="red")),
+           lower=list(continuous=wrap(my_lower,alpha=0.25,fill="black")),
            diag=list(continuous=wrap(my_density,alpha=0.5)),
            upper=list(continuous=wrap("cor",size=4)))+
           theme_bw()
 ```
 
-**Figure `r iFig=iFig+1; iFig`** Comparison of trends in last 5 years. 
+**Figure `r iFig=iFig+1; iFig`** Correlations between trends in last 5 years. 
 
 
 ```{r, 2o3}
@@ -135,27 +135,34 @@ t23=ddply(bbmsy, .(assessid), with, data.frame(
 
 ggpairs(t23[,-1],
            columnLabels=c("True\nAbundance","Biomass\nDynamic","BD with 40% CV","SRA"),
-           lower=list(continuous=wrap(my_lower,alpha=0.25,col="black",fill="red")),
+           lower=list(continuous=wrap(my_lower,alpha=0.25,fill="black")),
            diag=list(continuous=wrap(my_density,alpha=0.5)),
            upper=list(continuous=wrap("cor",size=4)))+
           theme_bw()
 ```
 
-**Figure `r iFig=iFig+1; iFig`** Comparison of 2 over 3, i.e. mean of last 2 years divided by mean in years -5 to -3. 
+**Figure `r iFig=iFig+1; iFig`** Comparison of ICES 2 over 3 rule, i.e. mean of last 2 years divided by mean in years -5 to -3. 
 
 
 ```{r, dplt-final}
 fnl=ddply(bbmsy, .(assessid), function(x) x[x$year==max(x$year),])
+save(fnl,file="/home/laurence-kell/Desktop/tmp/fnl.RData")
 
 ggpairs(log(fnl[,c("biomass","bd","bd4","sra")]),
            columnLabels=c("True\nAbundance","Biomass\nDynamic","BD with 40% CV","SRA"),
-           lower=list(continuous=wrap(my_lower,alpha=0.25,col="black",fill="red")),
+           lower=list(continuous=wrap(my_lower,alpha=0.25,fill="black")),
            diag=list(continuous=wrap(my_density,alpha=0.5)),
            upper=list(continuous=wrap("cor",size=4)))+
           theme_bw()
 ```
 
 **Figure `r iFig=iFig+1; iFig`** Comparison of depeletion estimates in final year. 
+
+```{r}
+with(fnl,table(bd<1,biomass<1))
+with(fnl,table(bd4<1,biomass<1))
+with(fnl,table(sra<1,biomass<1))
+```
 
 
 ```{r, cv}
@@ -230,3 +237,63 @@ ggplot(dat)+
 ```
 
 **Figure `r iFig=iFig+1; iFig`** BD F*T
+
+```{r}
+orn=transform(melt(bbmsy[,c(1:5,7)],id=c("assessid","year")),value=value<1.2)
+red=transform(melt(bbmsy[,c(1:5,7)],id=c("assessid","year")),value=value<0.8)
+
+orn=ddply(subset(orn,!is.na(value)),.(year,variable), with, mean(as.numeric(value)))
+red=ddply(subset(red,!is.na(value)),.(year,variable), with, mean(as.numeric(value)))
+
+ggplot()+
+  geom_ribbon(aes(year,ymin=0,ymax=1), fill="green",  data=red)+
+  geom_ribbon(aes(year,ymin=0,ymax=V1),fill="orange", data=orn)+
+  geom_ribbon(aes(year,ymin=0,ymax=V1),fill="red",    data=red)+
+  facet_grid(variable~.)+
+  scale_x_continuous(lim=c(1980,2015))+
+  xlab("Year")+ylab("Probability")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Comparisons of stock status using FAO criteria for the different approaches
+
+```{r, eval=FALSE}
+###To assess the status of all and compare these
+sbiomass=bbmsy$biomass
+
+bd4=ddply(bbmsy,.(year,assessid), with, bbmsy$bd4>0.8)
+
+0.8, 1.2
+
+for(i in 1:dim(bbmsy)[1])
+  if (bbmsy$biomass[i]<0.8) {sbiomass[i]<-0} else{if(bbmsy$biomass[i]>1.2){sbiomass[i]<-2}else{{sbiomass[i]<-1}}}
+
+sbd<-bbmsy$bd
+sbd4<-bbmsy$bd4
+ssra<-bbmsy$sra
+nbd<-bbmsy$bd
+nbd4<-bbmsy$bd4
+nsra<--bbmsy$sra
+nbd<-ifelse(is.na(nbd) == TRUE, 1, nbd)
+nbd4<-ifelse(is.na(nbd4) == TRUE, 1, nbd4)
+nsra<-ifelse(is.na(ssra) == TRUE, 1, ssra)
+
+for(i in 1:dim(bbmsy)[1])
+  if (nbd[i]<0.8){sbd[i]<-0} else{if(nbd[i]>1.2){sbd[i]<-2}else{if(nbd[i]==1){sbd[i]<-3}else{sbd[i]<-1}}}
+
+for(i in 1:dim(bbmsy)[1])
+  if (nbd4[i]<0.8){sbd4[i]<-0} else{if(nbd4[i]>1.2){sbd4[i]<-2}else{if(nbd4[i]==1){sbd4[i]<-3}else{sbd4[i]<-1}}}
+
+for(i in 1:dim(bbmsy)[1])
+  if (nsra[i]<0.8){ssra[i]<-0} else{if(nsra[i]>1.2){ssra[i]<-2}else{if(nsra[i]==1){ssra[i]<-3}else{ssra[i]<-1}}}
+
+status<-data.frame(year=bbmsy$year,
+                   stock=bbmsy$stockid,
+                   bd=sbiomass,
+                   bd4=sbd,sbd4,
+                   sra=ssra)
+
+colnames(status) <- c("Year","Stock","SBio", "STrueAI", "SAIerror","SSRA")
+#out<-write.csv(status,file=paste("Myersstatus",".csv", sep=""))
+
+```
+
