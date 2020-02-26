@@ -1,0 +1,377 @@
+---
+title: "Data poor validation" 
+subtitle: "Myers data"
+author: "Laurence Kell"
+output: rmarkdown:::word_document
+vignette: >
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEncoding{UTF-8}
+tags: FLPKG FLR
+license: Creative Commons Attribution-ShareAlike 4.0 International
+---
+  
+```{r knitr_init, echo=FALSE, results="hide"}
+library(knitr)
+## Global options
+opts_chunk$set(echo    =FALSE,
+               eval    =TRUE,
+               cache   =TRUE,
+               cache.path="../cache/myers/",
+               prompt  =FALSE,
+               comment =NA,
+               message =FALSE,
+               tidy    =FALSE,
+               warning =FALSE,
+               fig.height=6,
+               fig.width =6,
+               fig.path  ="../tex/myers-",
+               dev       ="png")
+
+options(digits=3)
+
+iFig=0
+```
+
+```{r, pkgs, echo=FALSE, message=FALSE}
+library(reshape)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+
+library(sraplus)
+```
+
+```{r, data, fig.height=6, fig.width=6}
+load("/home/laurence-kell/Desktop/rfmo/iccat/sc-eco/iccat/jabba/jabbaiccat.RData")
+
+jabbaiccat=jabbaiccat[sort(names(jabbaiccat))]
+
+spp=c("Thunnus obesus",
+      "Kajikia albida",
+      "Xiphias gladius",
+      "Makaira nigricans",
+      "Thunnus albacares")
+names(spp)=names(jabbaiccat)
+jb=ldply(jabbaiccat,function(x)
+       data.frame(year=x$timeseries$year,b=x$timeseries$ssb,b_div_bmsy=x$timeseries$ssb/x$refpts$bmsy[1]))
+names(jb)[1]="sp"
+```
+
+
+```{r, db, eval=FALSE}
+bds=mlply(data.frame(sp=names(spp)), function(sp){
+
+  x=jabbaiccat[[sp]]
+  
+  cdp<-try(sraplus::format_driors(
+    use_heuristics=!TRUE,
+    taxa          =spp[sp],
+    
+    index      = x$timeseries$ssb,
+    index_year = x$timeseries$year,
+    catch      = x$timeseries$catch,
+    years      = x$timeseries$year
+    ))
+  
+  fit<-try(sraplus::fit_sraplus(
+    driors = cdp,      
+    engine = "tmb",
+    model  = "sraplus_tmb",
+    estimate_qslope = FALSE,
+    estimate_proc_error = TRUE))
+
+  if ("try-error"%in%is(fit)) return(NULL)
+  
+  fit})
+
+save(bds,file="/home/laurence-kell/Desktop/papers/data-poor/results/jabbaBDResults.RData")
+```
+
+
+```{r, db4, eval=FALSE}
+bd4=mlply(data.frame(sp=names(spp)), function(sp){
+
+  x=jabbaiccat[[sp]]
+  
+  set.seed(1234)
+  
+  cdp<-try(sraplus::format_driors(
+    use_heuristics=!TRUE,
+    taxa          =spp[sp],
+    
+    index      = x$timeseries$ssb*rev(rlnorm(length(x$timeseries$ssb),0,0.4)),
+    index_year = x$timeseries$year,
+    catch      = x$timeseries$catch,
+    years      = x$timeseries$year
+    ))
+  
+  fit<-try(sraplus::fit_sraplus(
+    driors = cdp,      
+    engine = "tmb",
+    model  = "sraplus_tmb",
+    estimate_qslope = FALSE,
+    estimate_proc_error = TRUE))
+
+  if ("try-error"%in%is(fit)) return(NULL)
+  
+  fit})
+
+save(bd4,file="/home/laurence-kell/Desktop/papers/data-poor/results/jabbaBD4Results.RData")
+```
+
+```{r, sra, eval=FALSE}
+sras=mlply(data.frame(sp=names(spp)), function(sp){
+  
+  x=jabbaiccat[[sp]]
+  
+  cdp<-try(sraplus::format_driors(
+    use_heuristics=TRUE,
+    taxa          =spp[sp],
+    
+    catch      = x$timeseries$catch,
+    years      = x$timeseries$year
+  ))
+  
+  
+  fit<-try(sraplus::fit_sraplus(
+    driors = cdp,
+    engine = "sir",
+    adapt_delta = 0.9,
+    max_treedepth = 10,
+    n_keep = 4000,
+    chains = 1,
+    cores = 1,
+    estimate_qslope = FALSE,
+    estimate_proc_error = TRUE))
+  
+  if ("try-error"%in%is(fit)) return(NULL)
+  
+  fit})
+
+save(sras,file="/home/laurence-kell/Desktop/papers/data-poor/results/jabbaSRAResults.RData")
+```
+
+
+```{r, srap, eval=FALSE}
+srap=mlply(data.frame(sp=names(spp)), function(sp){
+  
+  print(sp)
+  print(spp[sp])
+  
+  x=jabbaiccat[[sp]]
+  r=x$pfunc[,"r"]
+  k=x$pfunc[,"k"]
+  p=x$pfunc[,"p"]
+  
+  cdp<-try(sraplus::format_driors(
+    use_heuristics=!TRUE,
+    taxa          =spp[sp],
+    catch         =x$timeseries$catch,
+    years         =x$timeseries$year,
+    
+    shape_prior       =p+1,
+    growth_rate_prior =r,
+    k_prior           =k,
+    initial_state     =0.75, #x$timeseries$ssb[1]/x$refpts[1,"k"],
+    terminal_state    =0.2, #x$timeseries$ssb[length(x$timeseries$ssb)]/x$refpts[1,"k"],
+
+    k_prior_cv          =0.3,
+    growth_rate_prior_cv=0.3,
+    shape_prior_cv      =0.3,
+    initial_state_cv    =0.3,
+    terminal_state_cv   =0.5
+  ))
+  
+  fit<-try(sraplus::fit_sraplus(
+    driors = cdp,
+    engine = "sir",
+    adapt_delta = 0.9,
+    max_treedepth = 10,
+    n_keep = 4000,
+    chains = 1,
+    cores = 1,
+    estimate_qslope = FALSE,
+    estimate_proc_error = TRUE))
+  
+  if ("try-error"%in%is(fit)) return(NULL)
+  
+  fit})
+
+save(srap,file="/home/laurence-kell/Desktop/papers/data-poor/results/jabbaSRPResults.RData")
+```
+
+```{r, eval=FALSE}
+library(fishmethods)
+source('~/Desktop/flr/fishmethods/R/catchmsy.R', echo=TRUE)
+
+cmsy=mlply(data.frame(sp=names(spp)), function(sp){
+  
+  print(sp)
+  print(spp[sp])
+  
+  
+  x=jabbaiccat[[sp]]
+  r=x$pfunc[,"r"]
+  k=x$pfunc[,"k"]
+  p=x$pfunc[,"p"]
+  
+  catch = x$timeseries$catch
+  year   = x$timeseries$year
+
+  fit<-catchmsy(
+      year   =year,
+      catch  =catch,
+      catchCV=NULL,
+      catargs=list(dist="none",low=0,up=Inf,unit="MT"),
+      l0=list(low=0.75, #max(1,min(x$timeseries$ssb[1]/x$refpts[1,"k"],1),
+              up =0.75, #min(x$timeseries$ssb[1]/x$refpts[1,"k"],1),
+              step=0),
+      lt=list(low  =0.1, #rev(x$timeseries$ssb)[1]/x$refpts[1,"k"]*0.5,
+              up   =0.5, #rev(x$timeseries$ssb)[1]/x$refpts[1,"k"]*2.0,
+              refyr=max(x$timeseries$year)),sigv=0,
+      k=list(dist="unif",low=k*.1,up=k*10,mean=0,sd=0),
+      r=list(dist="unif",low=r*.2,up=r*2,mean=0,sd=0),
+      M=list(dist="unif",low=0.2,up=0.2,mean=0.00,sd=0.00),
+      nsims=30000,
+      graphs=NULL)
+
+  fit})
+
+save(cmsy,file="/home/laurence-kell/Desktop/papers/data-poor/results/jabbaCMSYResults.RData")
+```
+
+```{r}
+load("/home/laurence-kell/Desktop/papers/data-poor/results/jabbaBDResults.RData")
+load("/home/laurence-kell/Desktop/papers/data-poor/results/jabbaBD4Results.RData")  
+load("/home/laurence-kell/Desktop/papers/data-poor/results/jabbaSRAResults.RData")
+load("/home/laurence-kell/Desktop/papers/data-poor/results/jabbaSRPResults.RData")
+load("/home/laurence-kell/Desktop/papers/data-poor/results/jabbaCMSYResults.RData")  
+
+bd=ldply(bds,function(x){
+  if (is.null(x)) return(NULL)
+  subset(x$results,variable%in%c("b_div_bmsy","b"))})
+
+bd4=ldply(bd4,function(x){
+  if (is.null(x)) return(NULL)
+  subset(x$results,variable%in%c("b_div_bmsy","b"))})
+
+sra=ldply(sras,function(x){
+  if (is.null(x)) return(NULL)
+  subset(x$results,variable%in%c("b_div_bmsy","b"))})
+
+srp=ldply(srap,function(x){
+  if (is.null(x)) return(NULL)
+  subset(x$results,variable%in%c("b_div_bmsy","b"))})
+
+cmsy.bmsy=ldply(cmsy,function(x){
+  dt=cbind(x$timeseries,bmsy=rep(x$Values$Bmsy,rep=length(unique(x$timeseries$year))))
+  ddply(dt, .(flag,year), with, quantile(value/bmsy,probs=c(0.975,0.945,0.5,0.045,0.025)))
+  })
+names(cmsy.bmsy)[c(5:7)]=c("upper","mean","lower")
+
+cmsy.b=ldply(cmsy,function(x){
+  dt=cbind(x$timeseries,bmsy=rep(x$Values$Bmsy,rep=length(unique(x$timeseries$year))))
+  ddply(dt, .(flag,year), with, quantile(value,probs=c(0.975,0.945,0.5,0.045,0.025)))
+  })
+names(cmsy.b)[c(5:7)]=c("upper","mean","lower")
+
+dat=rbind.fill(cbind(Model="Catch & Index",        bd),
+               cbind(Model="Catch & Index Error",  bd4),
+               cbind(Model="Catch & Heuristics",   sra),
+               cbind(Model="Catch & Priors",       srp),
+               cbind(Model="CMSY",           subset(cmsy.b,   flag==1),variable="b"),
+               cbind(Model="CMSY",           subset(cmsy.bmsy,flag==1),variable="b_div_bmsy"))[c(1:4,6:8)]
+```
+
+
+```{r}
+ggplot(subset(dat,variable=="b"))+ 
+  geom_ribbon(aes(year,ymax=upper,ymin=lower),fill="red",alpha=0.25)+
+  geom_line(aes(year,mean),col="red")+
+  geom_line(aes(year,b),data=jb)+
+  facet_grid(sp~Model,scale="free")+
+  xlab("Biomass")+ylab("Year")+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`** Absolute trends in abundance for all stocks and methods (black line are the true values).
+
+
+```{r}
+ggplot(subset(dat,variable=="b"&Model=="Catch & Index"))+ 
+  geom_ribbon(aes(year,ymax=upper,ymin=lower),fill="red",alpha=0.25)+
+  geom_line(aes(year,mean),col="red")+
+  geom_line(aes(year,b),data=jb)+
+  facet_grid(sp~Model,scale="free")+
+  xlab("Biomass")+ylab("Year")+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`** Absolute trends estimated by SRA+ using catch and the perfect index of abundance.
+
+
+```{r}
+ggplot(subset(dat,variable=="b"&Model=="Catch & Index Error"))+ 
+  geom_ribbon(aes(year,ymax=upper,ymin=lower),fill="red",alpha=0.25)+
+  geom_line(aes(year,mean),col="red")+
+  geom_line(aes(year,b),data=jb)+
+  facet_grid(sp~Model,scale="free")+
+  xlab("Biomass")+ylab("Year")+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`** Absolute trends: estimated by SRA+ using catch and the index of abundance with a CV of 40%.
+
+
+```{r}
+ggplot(subset(dat,variable=="b"&Model=="Catch & Heuristics"))+ 
+  geom_ribbon(aes(year,ymax=upper,ymin=lower),fill="red",alpha=0.25)+
+  geom_line(aes(year,mean),col="red")+
+  geom_line(aes(year,b),data=jb)+
+  facet_grid(sp~Model,scale="free")+
+  xlab("Biomass")+ylab("Year")+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`** Absolute trends: estimated by SRA+ using catch only and heuristics.
+
+
+```{r}
+ggplot(subset(dat,variable=="b"&Model=="Catch & Priors"))+ 
+  geom_ribbon(aes(year,ymax=upper,ymin=lower),fill="red",alpha=0.25)+
+  geom_line(aes(year,mean),col="red")+
+  geom_line(aes(year,b),data=jb)+
+  facet_grid(sp~Model,scale="free")+
+  xlab("Biomass")+ylab("Year")+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`** Absolute trends: estimated by SRA+ using catch only and priors for r, k and p.
+
+
+```{r}
+ggplot(subset(dat,variable=="b"&Model=="CMSY"))+ 
+  geom_ribbon(aes(year,ymax=upper,ymin=lower),fill="red",alpha=0.25)+
+  geom_line(aes(year,mean),col="red")+
+  geom_line(aes(year,b),data=jb)+
+  facet_grid(sp~Model,scale="free")+
+  xlab("Biomass")+ylab("Year")+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`** Absolute trends: estiimated by catchmsy.
+
+```{r}
+ggplot(subset(dat,variable=="b_div_bmsy"))+ 
+  geom_hline(aes(yintercept=1))+
+  geom_ribbon(aes(year,ymax=upper,ymin=lower),fill="red",alpha=0.25)+
+  geom_line(aes(year,mean),col="red")+
+  geom_line(aes(year,b_div_bmsy),data=jb)+
+  facet_grid(sp~Model,scale="free")+
+  xlab(expression(B:B[MSY]))+ylab("Year")+
+  theme_bw()
+```
+
+**Figure `r iFig=iFig+1; iFig`** Trends relative to $B/B_{MSY}$ 
+

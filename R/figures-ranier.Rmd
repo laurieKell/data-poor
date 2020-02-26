@@ -1,0 +1,167 @@
+---
+title: "Data poor validation" 
+subtitle: "ICES data"
+author: "Laurence Kell"
+output: rmarkdown:::word_document
+vignette: >
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEncoding{UTF-8}
+tags: FLPKG FLR
+license: Creative Commons Attribution-ShareAlike 4.0 International
+---
+  
+```{r knitr_init, echo=FALSE, results="hide"}
+library(knitr)
+## Global options
+opts_chunk$set(echo    =FALSE,
+               eval    =TRUE,
+               cache   =TRUE,
+               cache.path="../cache/myers/",
+               prompt  =FALSE,
+               comment =NA,
+               message =FALSE,
+               tidy    =FALSE,
+               warning =FALSE,
+               fig.height=6,
+               fig.width =6,
+               fig.path  ="../tex/myers-",
+               dev       ="png")
+
+options(digits=3)
+
+iFig=0
+```
+
+```{r, pkgs, echo=FALSE, message=FALSE}
+library(reshape)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+
+library(sraplus)
+```
+
+```{r, data, fig.height=6, fig.width=6}
+ices=read.csv("/home/laurence-kell/Desktop/papers/data-poor/inputs/ranier/Stocks_Catch_Test.csv")
+key =read.csv("/home/laurence-kell/Desktop/papers/data-poor/inputs/ranier/Stocks_ID_Rishi.csv")
+
+names(ices)=c("stock","year","catch","biomass")
+names(key)[c(3,7)]=c("stock","species")
+
+ices=merge(ices,key[,c(3,7)])
+```
+
+
+```{r, db}
+id=as.character(unique(ices$stock))
+id=id[!(id%in%c("her.27.3a47d","lez.27.4a6a","cod.27.5a"))]
+
+bds=mlply(data.frame(id=id,stringsAsFactors=FALSE), function(id){
+
+  print(id)
+  
+  x=subset(ices,stock==id)
+  
+  cdp<-try(sraplus::format_driors(
+    use_heuristics=!TRUE,
+    taxa          =as.character(x$species[1]),
+    
+    index      = x$biomass,
+    index_year = x$year,
+    catch      = x$catch,
+    years      = x$year
+     
+    # k_prior	            =x$pfunc$k,
+    # growth_rate_prior   =x$pfunc$r,
+    # shape_prior         =x$pfunc$p+1,
+    # initial_state       =x$timeseries$ssb[1]/x$refpts[1,"k"],
+    # terminal_state      =x$timeseries$ssb[length(x$timeseries$ssb)]/x$refpts[1,"k"],
+
+    # k_prior_cv          =0.1,
+    # growth_rate_prior_cv=0.1,
+    # shape_prior_cv      =0.1,
+    # initial_state_cv    =0.1,
+    # terminal_state_cv   =0.1
+    ))
+  
+  fit<-try(sraplus::fit_sraplus(
+    driors = cdp,      
+    engine = "tmb",
+    model  = "sraplus_tmb",
+    estimate_qslope = FALSE,
+    estimate_proc_error = TRUE))
+
+  if ("try-error"%in%is(fit)) return(NULL)
+  
+  fit})
+
+save(bds,file="/home/laurence-kell/Desktop/papers/data-poor/results/icesBD.RData")
+
+bd=ldply(bds,function(x){
+  if (is.null(x)) return(NULL)
+  subset(x$results,variable%in%c("b_div_bmsy","b"))})
+
+save(bd,file="/home/laurence-kell/Desktop/papers/data-poor/results/icesBDResults.RData")
+```
+
+```{r, sra}
+sras=mlply(data.frame(id=as.character(unique(ices$stock)),stringsAsFactors=FALSE), function(id){
+
+  print(id)
+
+  x=subset(ices,stock==id)
+  
+  cdp<-try(sraplus::format_driors(
+    use_heuristics=TRUE,
+    taxa          =as.character(x$species[1]),
+    catch         =x$catch,
+    years         =x$year
+  ))
+  
+  fit<-try(sraplus::fit_sraplus(
+    driors = cdp,
+    engine = "sir",
+    adapt_delta = 0.9,
+    max_treedepth = 10,
+    n_keep = 4000,
+    chains = 1,
+    cores = 1,
+    estimate_qslope = FALSE,
+    estimate_proc_error = TRUE))
+  
+  if ("try-error"%in%is(fit)) return(NULL)
+  
+  fit})
+
+save(sras,file="/home/laurence-kell/Desktop/papers/data-poor/results/icesSRA.RData")
+
+sra=ldply(sras,function(x){
+  if (is.null(x)) return(NULL)
+  subset(x$results,variable%in%c("b_div_bmsy","b"))})
+
+save(sra,file="/home/laurence-kell/Desktop/papers/data-poor/results/icesSRAResults.RData")
+```
+
+```{r}
+ggplot(rbind(cbind(Method="Catch & Index",subset(bd, variable=="b")),
+             cbind(Method="Catch",        subset(sra,variable=="b"))))+
+  geom_ribbon(aes(year,ymax=upper,ymin=lower),fill="red",alpha=0.25)+
+  geom_line(aes(year,mean),col="red")+
+  #geom_line(aes(year,biomass),data=ices)+
+  facet_grid(id~Method,scale="free")
+```
+
+```{r}
+dat=rbind(cbind(Method="Catch & Index",subset(bd, variable=="b_div_bmsy")),
+             cbind(Method="Catch",        subset(sra,variable=="b_div_bmsy")))
+ggplot(dat)+
+  geom_ribbon(aes(year,ymax=upper,ymin=lower),fill="red",alpha=0.25)+
+  geom_line(aes(year,mean),col="red")+
+  facet_grid(id~Method,scale="free")
+```
+
+**Figure `r iFig=iFig+1; iFig`** Trends relative to $B/B_{MSY}$ 
+
+
+

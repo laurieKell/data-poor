@@ -5,7 +5,7 @@ library(ggplot2)
 
 library(sraplus)
 
-load("/home/laurence-kell/Desktop/rfmo/iccat/sc-eco/inputs/jabbaiccat.RData")
+load("/home/laurence-kell/Desktop/rfmo/iccat/sc-eco/iccat/jabba/jabbaiccat.RData")
 
 jabbaiccat=jabbaiccat[sort(names(jabbaiccat))]
 
