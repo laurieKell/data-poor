@@ -7,13 +7,6 @@ dirMy="/home/laurence-kell/Desktop/papers/data-poor"
 
 
 
-#These heuristics are that if catch in the first
-#  year is less than 20% of maximum catch, initial depletion is assumed to be between 50% and 90% of carrying
-#  capacity, otherwise it is assumed to be between 20% and 60% For final depletion, the heuristic assumes that
-#  if final catch is greater than 50% of max catch, final depletion is between 30%-70%, 1%-50% otherwise
-
-
-
 ###########################################################################################################
 ## Datasets ###############################################################################################
 ###########################################################################################################

@@ -52,7 +52,6 @@ bbmsy=cast(bbmsy,assessid+year~run,value="mean")
 bbmsy=merge(bbmsy,myers,by=c("assessid","year"))
 ```
 
-
 ```{r, trend}
 trnd=bbmsy[,c("biomass","bd","bd4","sra","dan")]
 
@@ -208,7 +207,7 @@ cvFn=function(x) (var(x,na.rm=TRUE)^1/2)/mean(x,na.rm=TRUE)
 
 
 ```{r}
-chk=ddply(fnl[,c(1,4:5)],.(assessid),with,data.frame(flag=!is.na(bd4)&!is.na(sra)))
+chk=ddply(fnl[,c(1,4:6)],.(assessid),with,data.frame(flag=!is.na(bd4)&!is.na(sra)))
 
 cat=transmute(fnl,catsra  =paste("OM=",biomass>1," MP=",sra>1,sep=""),
                   catbd   =paste("OM=",biomass>1," MP=",bd4>1,sep=""),
@@ -275,13 +274,13 @@ ggplot(dat)+
 
 **Figure `r iFig=iFig+1; iFig`** BD F*T
 
-```{r}
+```{r, eval=FALSE}
 save(bbmsy,file="/home/laurence-kell/Desktop/tmp/bbmsy.RData")
 ```
 
 ```{r, fao, fig.height=8}
-orn=transform(melt(bbmsy[,c(1:5,7)],id=c("assessid","year")),value=value<1.2)
-red=transform(melt(bbmsy[,c(1:5,7)],id=c("assessid","year")),value=value<0.8)
+orn=transform(melt(bbmsy[,c(1:4,6)],id=c("assessid","year")),value=value<1.2)
+red=transform(melt(bbmsy[,c(1:4,6)],id=c("assessid","year")),value=value<0.8)
 
 orn=ddply(subset(orn,!is.na(value)),.(year,variable), with, mean(as.numeric(value)))
 red=ddply(subset(red,!is.na(value)),.(year,variable), with, mean(as.numeric(value)))
@@ -299,7 +298,7 @@ ggplot()+
 
 
 ```{r, class1, fig.height=4}
-dt1=melt(subset(bbmsy[,c(1:5,7)],biomass>=1.2),id=c("assessid","year"))
+dt1=melt(subset(bbmsy[,c(1:4,6,8)],biomass>=1.2),id=c("assessid","year"))
 dt1=ddply(dt1,.(year,variable), with, mean(as.numeric(value>1.2),na.rm=TRUE))
 
 ggplot(subset(dt1,year>1980&variable!="biomass"))+
@@ -313,7 +312,7 @@ ggplot(subset(dt1,year>1980&variable!="biomass"))+
 
 
 ```{r, class2, fig.height=4}
-dt1=melt(subset(bbmsy[,c(1:5,7)],biomass<1.2),id=c("assessid","year"))
+dt1=melt(subset(bbmsy[,c(1:4,6,8)],biomass<1.2),id=c("assessid","year"))
 dt1=ddply(dt1,.(year,variable), with, mean(as.numeric(value<1.2),na.rm=TRUE))
 
 ggplot(subset(dt1,year>1980&variable!="biomass"))+
@@ -328,7 +327,7 @@ ggplot(subset(dt1,year>1980&variable!="biomass"))+
 
 
 ```{r, class3, fig.height=4}
-dt1=melt(subset(bbmsy[,c(1:5,7)],biomass>=0.8),id=c("assessid","year"))
+dt1=melt(subset(bbmsy[,c(1:4,6,8)],biomass>=0.8),id=c("assessid","year"))
 dt1=ddply(dt1,.(year,variable), with, mean(as.numeric(value>=0.8),na.rm=TRUE))
 
 ggplot(subset(dt1,year>1980&variable!="biomass"))+
@@ -342,7 +341,7 @@ ggplot(subset(dt1,year>1980&variable!="biomass"))+
 
 
 ```{r, class4, fig.height=4}
-dt1=melt(subset(bbmsy[,c(1:5,7)],biomass<=0.8),id=c("assessid","year"))
+dt1=melt(subset(bbmsy[,c(1:4,6,8)],biomass<=0.8),id=c("assessid","year"))
 dt1=ddply(dt1,.(year,variable), with, mean(as.numeric(value<=0.8),na.rm=TRUE))
 
 ggplot(subset(dt1,year>1980&variable!="biomass"))+
@@ -361,8 +360,6 @@ ggplot(subset(dt1,year>1980&variable!="biomass"))+
 sbiomass=bbmsy$biomass
 
 bd4=ddply(bbmsy,.(year,assessid), with, bbmsy$bd4>0.8)
-
-0.8, 1.2
 
 for(i in 1:dim(bbmsy)[1])
   if (bbmsy$biomass[i]<0.8) {sbiomass[i]<-0} else{if(bbmsy$biomass[i]>1.2){sbiomass[i]<-2}else{{sbiomass[i]<-1}}}
@@ -394,7 +391,6 @@ status<-data.frame(year=bbmsy$year,
 
 colnames(status) <- c("Year","Stock","SBio", "STrueAI", "SAIerror","SSRA")
 #out<-write.csv(status,file=paste("Myersstatus",".csv", sep=""))
-
 ```
 
 
