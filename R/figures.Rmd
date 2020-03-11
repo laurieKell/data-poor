@@ -52,9 +52,18 @@ bbmsy=cast(bbmsy,assessid+year~run,value="mean")
 bbmsy=merge(bbmsy,myers,by=c("assessid","year"))
 ```
 
-```{r, trend}
-trnd=bbmsy[,c("biomass","bd","bd4","sra","dan")]
+```{r}
+save(bbmsy,file="/home/laurence-kell/Desktop/rfmo/iccat/sc-eco/2020/papers/scrs2020-unassessed/data/bbmsy.RData")
+```
 
+```{r, trend}
+trnd=ddply(bbmsy[,c("assessid","biomass","bd","bd4","sra","dan")],.(assessid),transform, 
+                                                                             biomass=biomass/mean(biomass,na.rm=T),
+                                                                             bd     =bd/mean(     bd,na.rm=T),
+                                                                             bd4    =bd4/mean(    bd4,na.rm=T),
+                                                                             sra    =sra/mean(    sra,na.rm=T),
+                                                                             dan    =dan/mean(    dan,na.rm=T))[,-1]
+           
 my_lower<-function(data,mapping,...){
   ggplot(data=data,mapping=mapping)+
     #geom_smooth(method="lm",se=FALSE,fullrange=TRUE)+
